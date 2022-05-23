@@ -1,45 +1,93 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: >
-  weight-managemnt
-  
-  Sample SAM Template for weight-managemnt
+  weight-management
+  Sample SAM Template for weight-management
 
+#パラメータの設定
+Parameters:
+  AdminMailAddress:
+    Type: String
+  MembersTableName:
+    Type: String
+  BucketName:
+    Type: String
 # More info about Globals: https://github.com/awslabs/serverless-application-model/blob/master/docs/globals.rst
 Globals:
   Function:
     Timeout: 5
+    Environment:
+      Variables:
+        # AdminMailAddress: !Ref AdminMailAddress
+        MEMBER_TABLE: !Ref MembersTableName
+        QUEUE_URL: !Ref SendQueue
 
 Resources:
-  HelloWorldFunction:
+  #S3バケットの作成
+  CSVUploadBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref BucketName
+
+  #SQSキューの作成
+  SendQueue: #名前を指定しないからランダムに作成される
+    Type: AWS::SQS::Queue
+  #メンバーテーブルの作成
+  MemberTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Ref MembersTableName
+      #email列を作り，キーとする
+      AttributeDefinitions:
+        - AttributeName: email
+          AttributeType: S
+      KeySchema:
+        - AttributeName: email
+          KeyType: HASH
+      #キャパシティは3
+      ProvisionedThroughput:
+        ReadCapacityUnits: 3
+        WriteCapacityUnits: 3
+
+      # # haserrorをグローバルセカンダリインデックスに
+      # GlobalSecondaryIndexes:
+      #   - IndexName: haserror-index
+      #     KeySchema:
+      #       - AttributeName: haserror
+      #         KeyType: HASH
+      #     Projection: # 属性の射影 = このキーで取得したいときに欲しい属性
+      #       ProjectionType: ALL
+      #     ProvisionedThroughput:
+      #       ReadCapacityUnits: 3
+      #       WriteCapacityUnits: 3
+
+  ReadCsvFunction:
     Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
     Properties:
-      CodeUri: hello-world/
-      Handler: hello-world
+      CodeUri: read-csv/
+      Handler: main
       Runtime: go1.x
       Architectures:
         - x86_64
       Tracing: Active # https://docs.aws.amazon.com/lambda/latest/dg/lambda-x-ray.html
+      Policies:
+        # DynamoのCRUD権限
+        - DynamoDBCrudPolicy:
+            TableName: !Ref MembersTableName
+        # キューへの送信権限
+        - SQSSendMessagePolicy:
+            QueueName: !GetAtt SendQueue.QueueName
+        # S3からの取得権限
+        - S3ReadPolicy:
+            BucketName: !Ref BucketName
       Events:
-        CatchAll:
-          Type: Api # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
+        BodyUploadEvent:
+          Type: S3
           Properties:
-            Path: /hello
-            Method: GET
-      Environment: # More info about Env Vars: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#environment-object
-        Variables:
-          PARAM1: VALUE
+            Bucket: !Ref CSVUploadBucket
+            Events: s3:ObjectCreated:*
 
 Outputs:
-  # ServerlessRestApi is an implicit API created out of Events key under Serverless::Function
-  # Find out more about other implicit resources you can reference within SAM
-  # https://github.com/awslabs/serverless-application-model/blob/master/docs/internals/generated_resources.rst#api
-  HelloWorldAPI:
-    Description: "API Gateway endpoint URL for Prod environment for First Function"
-    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/hello/"
-  HelloWorldFunction:
-    Description: "First Lambda Function ARN"
-    Value: !GetAtt HelloWorldFunction.Arn
-  HelloWorldFunctionIamRole:
-    Description: "Implicit IAM Role created for Hello World function"
-    Value: !GetAtt HelloWorldFunctionRole.Arn
+  ReadCsvFunction:
+    Description: 'ReadCsvFunction ARN'
+    Value: !GetAtt ReadCsvFunction.Arn

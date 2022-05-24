@@ -10,7 +10,9 @@ Parameters:
     Type: String
   MembersTableName:
     Type: String
-  BucketName:
+  CSVBucketName:
+    Type: String
+  HostingBucketName:
     Type: String
 # More info about Globals: https://github.com/awslabs/serverless-application-model/blob/master/docs/globals.rst
 Globals:
@@ -18,16 +20,45 @@ Globals:
     Timeout: 5
     Environment:
       Variables:
-        # AdminMailAddress: !Ref AdminMailAddress
+        ADMIN_MAIL_ADDRESS: !Ref AdminMailAddress
         MEMBER_TABLE: !Ref MembersTableName
         QUEUE_URL: !Ref SendQueue
+        REGION: 'ap-northeast-1'
 
 Resources:
-  #S3バケットの作成
+  #csvアップロードS3バケットの作成
   CSVUploadBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Ref BucketName
+      BucketName: !Ref CSVBucketName
+
+  #静的ホスティングバケットの作成
+  HostingBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref HostingBucketName
+
+      AccessControl: PublicRead
+      WebsiteConfiguration:
+        IndexDocument: index.html
+
+  BucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      PolicyDocument:
+        Id: S3MyPolicy
+        Version: 2012-10-17
+        Statement:
+          - Sid: PublicReadForGetBucketObjects
+            Effect: Allow
+            Principal: '*'
+            Action: 's3:GetObject'
+            Resource: !Join
+              - ''
+              - - 'arn:aws:s3:::'
+                - !Ref HostingBucket
+                - /*
+      Bucket: !Ref HostingBucket
 
   #SQSキューの作成
   SendQueue: #名前を指定しないからランダムに作成される
@@ -60,7 +91,7 @@ Resources:
       #     ProvisionedThroughput:
       #       ReadCapacityUnits: 3
       #       WriteCapacityUnits: 3
-
+  #CSV解析関数
   ReadCsvFunction:
     Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
     Properties:
@@ -79,14 +110,36 @@ Resources:
             QueueName: !GetAtt SendQueue.QueueName
         # S3からの取得権限
         - S3ReadPolicy:
-            BucketName: !Ref BucketName
+            BucketName: !Ref CSVBucketName
       Events:
         BodyUploadEvent:
           Type: S3
           Properties:
             Bucket: !Ref CSVUploadBucket
             Events: s3:ObjectCreated:*
-
+  #メール送信関数
+  SendMailFunction:
+    Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+    Properties:
+      CodeUri: send-mail/
+      Handler: main
+      Runtime: go1.x
+      Architectures:
+        - x86_64
+      Tracing: Active # https://docs.aws.amazon.com/lambda/latest/dg/lambda-x-ray.html
+      Policies:
+        # DynamoのCRUD権限
+        - DynamoDBCrudPolicy:
+            TableName: !Ref MembersTableName
+        #SESを用いたメール送信
+        - SESCrudPolicy:
+            IdentityName: !Ref AdminMailAddress
+      Events:
+        SQSReceiveEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt SendQueue.Arn
+            BatchSize: 10
 Outputs:
   ReadCsvFunction:
     Description: 'ReadCsvFunction ARN'

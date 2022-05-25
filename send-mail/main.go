@@ -22,7 +22,7 @@ func issuePreSignedUrl() (string, error) {
 	svc := s3.New(sess)
 
 	req, _ := svc.GetObjectRequest(&s3.GetObjectInput{
-		Bucket: aws.String("hosting-sample1234"),
+		Bucket: aws.String(os.Getenv("HOSTING_BUCKET")),
 		Key:    aws.String("index.html"),
 	})
 

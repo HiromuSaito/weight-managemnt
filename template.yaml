@@ -24,6 +24,7 @@ Globals:
         MEMBER_TABLE: !Ref MembersTableName
         QUEUE_URL: !Ref SendQueue
         REGION: 'ap-northeast-1'
+        HOSTING_BUCKET: !Ref HostingBucketName
 
 Resources:
   #csvアップロードS3バケットの作成
@@ -117,6 +118,7 @@ Resources:
           Properties:
             Bucket: !Ref CSVUploadBucket
             Events: s3:ObjectCreated:*
+
   #メール送信関数
   SendMailFunction:
     Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
@@ -140,6 +142,37 @@ Resources:
           Properties:
             Queue: !GetAtt SendQueue.Arn
             BatchSize: 10
+
+  MyAPI:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: dev
+      Cors:
+        AllowMethods: "'POST,OPTIONS'"
+        AllowHeaders: "'content-type'"
+        AllowOrigin: "'*'"
+        AllowCredentials: "'*'"
+
+  SaveDataFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: save-data/
+      Handler: main
+      Runtime: go1.x
+      Architectures:
+        - x86_64
+      Tracing: Active
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref MembersTableName
+      Events:
+        PostWeight:
+          Type: Api
+          Properties:
+            Path: /weight
+            Method: POST
+            RestApiId: !Ref MyAPI
+
 Outputs:
   ReadCsvFunction:
     Description: 'ReadCsvFunction ARN'

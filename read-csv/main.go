@@ -76,7 +76,7 @@ func bulkUpdateMember(members []Member) error {
 		}
 
 		input := &dynamodb.PutItemInput{
-			TableName: aws.String("members"),
+			TableName: aws.String(os.Getenv("MEMBER_TABLE")),
 			Item:      av,
 		}
 
@@ -127,18 +127,21 @@ func handler(event events.S3Event) {
 		members, err := s3ObjectToMembers(s3Object)
 		if err != nil {
 			log.Printf("csv unmarshal error:%s", err)
+			return
 		}
 
 		//dynamodbへの登録
 		err = bulkUpdateMember(members)
 		if err != nil {
 			log.Printf("dynamodb update error:%s", err)
+			return
 		}
 
 		//sqsへの送信
 		err = sendSqsMessage(members)
 		if err != nil {
 			log.Printf("send sqs message error:%s", err)
+			return
 		}
 	}
 

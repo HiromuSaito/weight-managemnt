@@ -1,60 +1,69 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta http-equiv="X-UA-Compatible" content="IE=edge">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet"
-    integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous">
-  <script src="https://code.jquery.com/jquery-3.6.0.min.js"
-    integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4=" crossorigin="anonymous"></script>
-  <script>
-    function onSubmit(){
-      let data = {
-        'email':$('#email').val(),
-        'height':Number($('#height').val()),
-        'weight':Number($('#weight').val()),
-      }
-      $.ajax({
-        'type':'POST',
-        'url': 'https://6ycumcbpe5.execute-api.ap-northeast-1.amazonaws.com/Stage/weight',
-        'contentType':'text/plain',
-        'data':JSON.stringify(data)
-      }).done(function (data,textStatus,jqXHR){
-        //成功
-        alert('送信成功')
-        $('#email').val('');
-        $('#height').val('')
-        $('#weight').val('')
-      }).fail(function(jqXHR,textStatus,errorThrown){
-        let err = []
-        try{
-          err =$.parseJSON(jqXHR.responseText)
-        }catch(e){
-
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC"
+      crossorigin="anonymous"
+    />
+    <script
+      src="https://code.jquery.com/jquery-3.6.0.min.js"
+      integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4="
+      crossorigin="anonymous"
+    ></script>
+    <script>
+      async function onSubmit() {
+        let data = {
+          email: $("#email").val(),
+          height: Number($("#height").val()),
+          weight: Number($("#weight").val()),
+        };
+        try {
+          const postRes = await fetch(
+            "https://hwkgfym8aj.execute-api.ap-northeast-1.amazonaws.com/Stage/weight",
+            {
+              method: "POST",
+              mode: "no-cors",
+              headers: {
+                "Content-Type": "application/json", //
+              },
+              body: JSON.stringify(data), // リクエストボディーにJSONデータを設定
+            }
+          );
+          alert("送信に成功しました。");
+        } catch (e) {
+          alert("エラーが発生しました。", e);
         }
-        alert('エラーが発生しました' + err['error'])
-      })
-    }
-  </script>
-  <title>Document</title>
-</head>
-<body>
-  <div class="container">
-    <h1>体重測定</h1>
-    <div class="form-group">
-      <label for="email">メールアドレス</label>
-      <input type="text" class="form-control" id="email">
+      }
+    </script>
+    <title>Document</title>
+  </head>
+  <body>
+    <div class="container">
+      <h1>体重測定</h1>
+      <div class="form-group">
+        <label for="email">メールアドレス</label>
+        <input type="text" class="form-control" id="email" />
+      </div>
+      <div class="form-group">
+        <label for="weight">体重</label>
+        <input type="text" class="form-control" id="weight" />
+      </div>
+      <div class="form-group">
+        <label for="height">身長</label>
+        <input type="text" class="form-control" id="height" />
+      </div>
+      <button
+        id="submit"
+        class="btn btn-primary"
+        onclick="onSubmit();return false;"
+      >
+        送信
+      </button>
     </div>
-    <div class="form-group">
-      <label for="weight">体重</label>
-      <input type="text" class="form-control" id="weight">
-    </div>
-    <div class="form-group">
-      <label for="height">身長</label>
-      <input type="text" class="form-control" id="height">
-    </div>
-    <button id="submit" class="btn btn-primary" onclick="onSubmit();return false;">送信</button>
-  </div>
-</body>
+  </body>
 </html>

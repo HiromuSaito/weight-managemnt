@@ -76,6 +76,12 @@ func handler(request events.APIGatewayProxyRequest) (events.APIGatewayProxyRespo
 	}
 	return events.APIGatewayProxyResponse{
 		StatusCode: http.StatusMethodNotAllowed,
+		Headers: map[string]string{
+			"Access-Control-Allow-Origin": "*",
+			"Access-Control-Allow-Methods": "POST,OPTIONS",
+			"Access-Control-Allow-Headers": "Content-Type",
+			"Content-Type": "application/json",
+		},
 	}, nil
 
 }

@@ -4,7 +4,6 @@ Description: >
   weight-management
   Sample SAM Template for weight-management
 
-#パラメータの設定
 Parameters:
   AdminMailAddress:
     Type: String
@@ -14,7 +13,6 @@ Parameters:
     Type: String
   HostingBucketName:
     Type: String
-# More info about Globals: https://github.com/awslabs/serverless-application-model/blob/master/docs/globals.rst
 Globals:
   Function:
     Timeout: 5
@@ -27,18 +25,15 @@ Globals:
         HOSTING_BUCKET: !Ref HostingBucketName
 
 Resources:
-  #csvアップロードS3バケットの作成
   CSVUploadBucket:
     Type: AWS::S3::Bucket
     Properties:
       BucketName: !Ref CSVBucketName
 
-  #静的ホスティングバケットの作成
   HostingBucket:
     Type: AWS::S3::Bucket
     Properties:
       BucketName: !Ref HostingBucketName
-
       AccessControl: PublicRead
       WebsiteConfiguration:
         IndexDocument: index.html
@@ -61,55 +56,36 @@ Resources:
                 - /*
       Bucket: !Ref HostingBucket
 
-  #SQSキューの作成
   SendQueue: #名前を指定しないからランダムに作成される
     Type: AWS::SQS::Queue
-  #メンバーテーブルの作成
   MemberTable:
     Type: AWS::DynamoDB::Table
     Properties:
       TableName: !Ref MembersTableName
-      #email列を作り，キーとする
       AttributeDefinitions:
         - AttributeName: email
           AttributeType: S
       KeySchema:
         - AttributeName: email
           KeyType: HASH
-      #キャパシティは3
       ProvisionedThroughput:
         ReadCapacityUnits: 3
         WriteCapacityUnits: 3
 
-      # # haserrorをグローバルセカンダリインデックスに
-      # GlobalSecondaryIndexes:
-      #   - IndexName: haserror-index
-      #     KeySchema:
-      #       - AttributeName: haserror
-      #         KeyType: HASH
-      #     Projection: # 属性の射影 = このキーで取得したいときに欲しい属性
-      #       ProjectionType: ALL
-      #     ProvisionedThroughput:
-      #       ReadCapacityUnits: 3
-      #       WriteCapacityUnits: 3
-  #CSV解析関数
   ReadCsvFunction:
-    Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+    Type: AWS::Serverless::Function 
     Properties:
       CodeUri: read-csv/
       Handler: main
       Runtime: go1.x
       Architectures:
         - x86_64
-      Tracing: Active # https://docs.aws.amazon.com/lambda/latest/dg/lambda-x-ray.html
+      Tracing: Active 
       Policies:
-        # DynamoのCRUD権限
         - DynamoDBCrudPolicy:
             TableName: !Ref MembersTableName
-        # キューへの送信権限
         - SQSSendMessagePolicy:
             QueueName: !GetAtt SendQueue.QueueName
-        # S3からの取得権限
         - S3ReadPolicy:
             BucketName: !Ref CSVBucketName
       Events:
@@ -119,21 +95,18 @@ Resources:
             Bucket: !Ref CSVUploadBucket
             Events: s3:ObjectCreated:*
 
-  #メール送信関数
   SendMailFunction:
-    Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+    Type: AWS::Serverless::Function 
     Properties:
       CodeUri: send-mail/
       Handler: main
       Runtime: go1.x
       Architectures:
         - x86_64
-      Tracing: Active # https://docs.aws.amazon.com/lambda/latest/dg/lambda-x-ray.html
+      Tracing: Active
       Policies:
-        # DynamoのCRUD権限
         - DynamoDBCrudPolicy:
             TableName: !Ref MembersTableName
-        #SESを用いたメール送信
         - SESCrudPolicy:
             IdentityName: !Ref AdminMailAddress
       Events:
@@ -143,15 +116,15 @@ Resources:
             Queue: !GetAtt SendQueue.Arn
             BatchSize: 10
 
-  MyAPI:
+  SaveDataAPI:
     Type: AWS::Serverless::Api
     Properties:
-      StageName: dev
+      StageName: stg
       Cors:
-        AllowMethods: "'POST,OPTIONS'"
-        AllowHeaders: "'content-type'"
+        AllowMethods: "'PUT,OPTIONS'"
+        AllowHeaders: "'Content-Type'"
         AllowOrigin: "'*'"
-        AllowCredentials: "'*'"
+        MaxAge: "'600'"
 
   SaveDataFunction:
     Type: AWS::Serverless::Function
@@ -171,7 +144,6 @@ Resources:
           Properties:
             Path: /weight
             Method: POST
-            RestApiId: !Ref MyAPI
 
 Outputs:
   ReadCsvFunction:

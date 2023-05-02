@@ -13,6 +13,8 @@ Parameters:
     Type: String
   HostingBucketName:
     Type: String
+  CalculateCsvBucketName:
+    Type: String
 Globals:
   Function:
     Timeout: 5
@@ -23,12 +25,30 @@ Globals:
         QUEUE_URL: !Ref SendQueue
         REGION: 'ap-northeast-1'
         HOSTING_BUCKET: !Ref HostingBucketName
+        CALCULATE_BUCKET: !Ref CalculateCsvBucketName
 
 Resources:
   CSVUploadBucket:
     Type: AWS::S3::Bucket
     Properties:
       BucketName: !Ref CSVBucketName
+
+  SendQueue: 
+    Type: AWS::SQS::Queue
+
+  MemberTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Ref MembersTableName
+      AttributeDefinitions:
+        - AttributeName: email
+          AttributeType: S
+      KeySchema:
+        - AttributeName: email
+          KeyType: HASH
+      ProvisionedThroughput:
+        ReadCapacityUnits: 3
+        WriteCapacityUnits: 3
 
   HostingBucket:
     Type: AWS::S3::Bucket
@@ -44,7 +64,6 @@ Resources:
         RestrictPublicBuckets: false
       WebsiteConfiguration:
         IndexDocument: index.html
-
   BucketPolicy:
     Type: AWS::S3::BucketPolicy
     Properties:
@@ -63,21 +82,10 @@ Resources:
                 - /*
       Bucket: !Ref HostingBucket
 
-  SendQueue: #名前を指定しないからランダムに作成される
-    Type: AWS::SQS::Queue
-  MemberTable:
-    Type: AWS::DynamoDB::Table
+  CalculateCsvBucket:
+    Type: AWS::S3::Bucket
     Properties:
-      TableName: !Ref MembersTableName
-      AttributeDefinitions:
-        - AttributeName: email
-          AttributeType: S
-      KeySchema:
-        - AttributeName: email
-          KeyType: HASH
-      ProvisionedThroughput:
-        ReadCapacityUnits: 3
-        WriteCapacityUnits: 3
+      BucketName: !Ref CalculateCsvBucketName
 
   ReadCsvFunction:
     Type: AWS::Serverless::Function 
@@ -152,8 +160,32 @@ Resources:
             Path: /weight
             Method: POST
             RestApiId: !Ref SaveDataAPI
-
+  WriteCsvFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: write-csv/
+      Handler: main
+      Runtime: go1.x
+      Architectures:
+        - x86_64
+      Tracing: Active
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref MembersTableName
+        - S3WritePolicy:
+            BucketName: !Ref CalculateCsvBucketName
+      Events:
+        SeduleCalculate:
+          Type: Schedule
+          Properties:
+            Schedule: cron(0 15 L * ? *) # 毎月末00:00に実行
 Outputs:
   ReadCsvFunction:
     Description: 'ReadCsvFunction ARN'
     Value: !GetAtt ReadCsvFunction.Arn
+  SaveDataFunction:
+    Description: 'SaveDataFunction ARN'
+    Value: !GetAtt SaveDataFunction.Arn
+  SaveDataAPI:
+    Description: 'SaveDataAPI ARN'
+    Value: !GetAtt SaveDataAPI.Arn

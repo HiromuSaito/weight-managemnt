@@ -34,7 +34,14 @@ Resources:
     Type: AWS::S3::Bucket
     Properties:
       BucketName: !Ref HostingBucketName
-      AccessControl: PublicRead
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: ObjectWriter
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
       WebsiteConfiguration:
         IndexDocument: index.html
 
@@ -121,7 +128,7 @@ Resources:
     Properties:
       StageName: stg
       Cors:
-        AllowMethods: "'PUT,OPTIONS'"
+        AllowMethods: "'POST,OPTIONS'"
         AllowHeaders: "'Content-Type'"
         AllowOrigin: "'*'"
         MaxAge: "'600'"
@@ -144,6 +151,7 @@ Resources:
           Properties:
             Path: /weight
             Method: POST
+            RestApiId: !Ref SaveDataAPI
 
 Outputs:
   ReadCsvFunction:

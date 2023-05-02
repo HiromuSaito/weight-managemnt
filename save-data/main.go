@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -12,7 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
-	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
+	"github.com/aws/aws-sdk-go/service/dynamodb/expression"
 )
 
 var sess *session.Session
@@ -29,26 +28,33 @@ func updateMember(member Member) error {
 	}))
 	db := dynamodb.New(sess)
 
-	av, err := dynamodbattribute.MarshalMap(member)
+	update := expression.UpdateBuilder{}.Set(expression.Name("weight"), expression.Value(member.Weight))
+	update.Set(expression.Name("height"), expression.Value(member.Height))
+
+	condition := expression.Name("email").Equal(expression.Value(member.Email))
+	expr, err := expression.NewBuilder().WithUpdate(update).WithCondition(condition).Build()
 	if err != nil {
-		return fmt.Errorf("dynamodb marshal map error:%s", err)
+		return err
 	}
 
-	input := &dynamodb.PutItemInput{
+	input := &dynamodb.UpdateItemInput{
 		TableName: aws.String(os.Getenv("MEMBER_TABLE")),
-		Item:      av,
+		Key: map[string]*dynamodb.AttributeValue{
+			"email": {
+				S: aws.String(member.Email),
+			},
+		},
+		ExpressionAttributeNames:  expr.Names(),
+		ExpressionAttributeValues: expr.Values(),
+		UpdateExpression:          expr.Update(),
+		ConditionExpression:       expr.Condition(),
+		ReturnValues:              aws.String(dynamodb.ReturnValueAllNew),
 	}
-
-	_, err = db.PutItem(input)
-	if err != nil {
-		return fmt.Errorf("dynamodb put error:%s", err)
-	}
-	return nil
+	_, err = db.UpdateItem(input)
+	return err
 }
 
 func saveData(request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
-	log.Println("body:", request.Body)
-
 	var member Member
 	if err := json.Unmarshal([]byte(request.Body), &member); err != nil {
 		log.Println(err)
@@ -77,10 +83,10 @@ func handler(request events.APIGatewayProxyRequest) (events.APIGatewayProxyRespo
 	return events.APIGatewayProxyResponse{
 		StatusCode: http.StatusMethodNotAllowed,
 		Headers: map[string]string{
-			"Access-Control-Allow-Origin": "*",
+			"Access-Control-Allow-Origin":  "*",
 			"Access-Control-Allow-Methods": "POST,OPTIONS",
 			"Access-Control-Allow-Headers": "Content-Type",
-			"Content-Type": "application/json",
+			"Content-Type":                 "application/json",
 		},
 	}, nil
 

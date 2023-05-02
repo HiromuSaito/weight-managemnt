@@ -186,6 +186,3 @@ Outputs:
   SaveDataFunction:
     Description: 'SaveDataFunction ARN'
     Value: !GetAtt SaveDataFunction.Arn
-  SaveDataAPI:
-    Description: 'SaveDataAPI ARN'
-    Value: !GetAtt SaveDataAPI.Arn

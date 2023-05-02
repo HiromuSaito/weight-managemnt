@@ -53,14 +53,12 @@ func sendMail(toAddress string, url string) error {
 			},
 		},
 		Source: aws.String(os.Getenv("ADMIN_MAIL_ADDRESS")),
-		// Source: aws.String("hiromu.s08.t27@gmail.com"),
 	}
 	_, err := svc.SendEmail(input)
 	return err
 }
 
 func updateSendFlag(email string) error {
-	log.Println("updateSendFlag")
 	db := dynamodb.New(sess)
 
 	update := expression.UpdateBuilder{}.Set(expression.Name("ismailsend"), expression.Value(true))
@@ -71,7 +69,7 @@ func updateSendFlag(email string) error {
 	}
 
 	input := &dynamodb.UpdateItemInput{
-		TableName: aws.String("members"),
+		TableName: aws.String(os.Getenv("MEMBER_TABLE")),
 		Key: map[string]*dynamodb.AttributeValue{
 			"email": {
 				S: aws.String(email),

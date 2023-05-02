@@ -23,8 +23,7 @@
           weight: Number($("#weight").val()),
         };
         try {
-          const postRes = await fetch(
-            "https://hwkgfym8aj.execute-api.ap-northeast-1.amazonaws.com/Stage/weight",
+          const postRes = await fetch("{SaveData APIのエンドポイント}",
             {
               method: "POST",
               mode: "no-cors",
